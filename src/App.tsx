@@ -22,33 +22,38 @@ const App = () => (
       <TooltipProvider>
         <Toaster />
         <Sonner />
-        <BrowserRouter>
+        <BrowserRouter
+          future={{
+            v7_startTransition: true,
+            v7_relativeSplatPath: true,
+          }}
+        >
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
-            <Route 
-              path="/dashboard" 
+            <Route
+              path="/dashboard"
               element={
                 <ProtectedRoute>
                   <Dashboard />
                 </ProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="/dashboard/pages" 
+            <Route
+              path="/dashboard/pages"
               element={
                 <ProtectedRoute>
                   <Pages />
                 </ProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="/dashboard/integrations" 
+            <Route
+              path="/dashboard/integrations"
               element={
                 <ProtectedRoute>
                   <Integrations />
                 </ProtectedRoute>
-              } 
+              }
             />
             <Route path="/p/:slug" element={<LandingPage />} />
             <Route path="/p/:slug/success" element={<Success />} />

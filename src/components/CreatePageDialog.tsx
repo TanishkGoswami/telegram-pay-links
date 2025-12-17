@@ -1,20 +1,20 @@
-import { useState } from 'react';
-import { Loader2, ArrowRight, ArrowLeft, Check } from 'lucide-react';
-import { z } from 'zod';
+import { useState } from "react";
+import { Loader2, ArrowRight, ArrowLeft, Check } from "lucide-react";
+import { z } from "zod";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
-import { useToast } from '@/hooks/use-toast';
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
 
 interface CreatePageDialogProps {
   open: boolean;
@@ -23,12 +23,15 @@ interface CreatePageDialogProps {
 }
 
 const step1Schema = z.object({
-  title: z.string().min(1, 'Title is required').max(100),
+  title: z.string().min(1, "Title is required").max(100),
   description: z.string().max(500).optional(),
-  telegramLink: z.string().url('Please enter a valid URL').refine(
-    (url) => url.includes('t.me') || url.includes('telegram'),
-    'Please enter a valid Telegram invite link'
-  ),
+  telegramLink: z
+    .string()
+    .url("Please enter a valid URL")
+    .refine(
+      (url) => url.includes("t.me") || url.includes("telegram"),
+      "Please enter a valid Telegram invite link"
+    ),
 });
 
 interface PlanInput {
@@ -37,7 +40,11 @@ interface PlanInput {
   currency: string;
 }
 
-export function CreatePageDialog({ open, onOpenChange, onSuccess }: CreatePageDialogProps) {
+export function CreatePageDialog({
+  open,
+  onOpenChange,
+  onSuccess,
+}: CreatePageDialogProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [step, setStep] = useState(1);
@@ -45,24 +52,28 @@ export function CreatePageDialog({ open, onOpenChange, onSuccess }: CreatePageDi
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Step 1 state
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [telegramLink, setTelegramLink] = useState('');
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [telegramLink, setTelegramLink] = useState("");
 
   // Step 2 state
   const [plans, setPlans] = useState<PlanInput[]>([
-    { months: 1, price: '', currency: 'USD' },
-    { months: 6, price: '', currency: 'USD' },
-    { months: 12, price: '', currency: 'USD' },
+    { months: 1, price: "", currency: "USD" },
+    { months: 6, price: "", currency: "USD" },
+    { months: 12, price: "", currency: "USD" },
   ]);
 
   const generateSlug = (text: string) => {
-    return text
-      .toLowerCase()
-      .replace(/[^a-z0-9\s-]/g, '')
-      .replace(/\s+/g, '-')
-      .replace(/-+/g, '-')
-      .substring(0, 50) + '-' + Date.now().toString(36);
+    return (
+      text
+        .toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, "")
+        .replace(/\s+/g, "-")
+        .replace(/-+/g, "-")
+        .substring(0, 50) +
+      "-" +
+      Date.now().toString(36)
+    );
   };
 
   const validateStep1 = () => {
@@ -80,7 +91,7 @@ export function CreatePageDialog({ open, onOpenChange, onSuccess }: CreatePageDi
   };
 
   const validateStep2 = () => {
-    const validPlans = plans.filter(p => p.price && parseFloat(p.price) > 0);
+    const validPlans = plans.filter((p) => p.price && parseFloat(p.price) > 0);
     if (validPlans.length === 0) {
       toast({
         title: "At least one plan required",
@@ -113,7 +124,7 @@ export function CreatePageDialog({ open, onOpenChange, onSuccess }: CreatePageDi
 
       // Create landing page
       const { data: pageData, error: pageError } = await supabase
-        .from('landing_pages')
+        .from("landing_pages")
         .insert({
           user_id: user.id,
           title,
@@ -128,9 +139,17 @@ export function CreatePageDialog({ open, onOpenChange, onSuccess }: CreatePageDi
 
       // Create plans
       const validPlans = plans
-        .filter(p => p.price && parseFloat(p.price) > 0)
-        .map(p => ({
+        .filter((p) => p.price && parseFloat(p.price) > 0)
+        .map((p) => ({
           landing_page_id: pageData.id,
+          plan_title:
+            p.months === 1
+              ? "1 Month"
+              : p.months === 6
+              ? "6 Months"
+              : p.months === 12
+              ? "1 Year"
+              : `${p.months} Months`,
           duration_months: p.months,
           price: parseFloat(p.price),
           currency: p.currency,
@@ -138,7 +157,7 @@ export function CreatePageDialog({ open, onOpenChange, onSuccess }: CreatePageDi
 
       if (validPlans.length > 0) {
         const { error: plansError } = await supabase
-          .from('plans')
+          .from("plans")
           .insert(validPlans);
 
         if (plansError) throw plansError;
@@ -150,22 +169,23 @@ export function CreatePageDialog({ open, onOpenChange, onSuccess }: CreatePageDi
       });
 
       // Reset form
-      setTitle('');
-      setDescription('');
-      setTelegramLink('');
+      setTitle("");
+      setDescription("");
+      setTelegramLink("");
       setPlans([
-        { months: 1, price: '', currency: 'USD' },
-        { months: 6, price: '', currency: 'USD' },
-        { months: 12, price: '', currency: 'USD' },
+        { months: 1, price: "", currency: "INR" },
+        { months: 6, price: "", currency: "INR" },
+        { months: 12, price: "", currency: "INR" },
       ]);
       setStep(1);
       onOpenChange(false);
       onSuccess();
     } catch (error: any) {
-      console.error('Error creating page:', error);
+      console.error("Error creating page:", error);
       toast({
         title: "Error",
-        description: error.message || "Failed to create page. Please try again.",
+        description:
+          error.message || "Failed to create page. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -174,7 +194,7 @@ export function CreatePageDialog({ open, onOpenChange, onSuccess }: CreatePageDi
   };
 
   const updatePlan = (index: number, field: keyof PlanInput, value: string) => {
-    setPlans(plans.map((p, i) => i === index ? { ...p, [field]: value } : p));
+    setPlans(plans.map((p, i) => (i === index ? { ...p, [field]: value } : p)));
   };
 
   return (
@@ -183,17 +203,24 @@ export function CreatePageDialog({ open, onOpenChange, onSuccess }: CreatePageDi
         <DialogHeader>
           <DialogTitle>Create Landing Page</DialogTitle>
           <DialogDescription>
-            {step === 1 
-              ? "Set up your channel information" 
-              : "Configure your subscription plans"
-            }
+            {step === 1
+              ? "Set up your channel information"
+              : "Configure your subscription plans"}
           </DialogDescription>
         </DialogHeader>
 
         {/* Progress indicator */}
         <div className="flex items-center gap-2 py-2">
-          <div className={`flex-1 h-1 rounded-full ${step >= 1 ? 'bg-primary' : 'bg-muted'}`} />
-          <div className={`flex-1 h-1 rounded-full ${step >= 2 ? 'bg-primary' : 'bg-muted'}`} />
+          <div
+            className={`flex-1 h-1 rounded-full ${
+              step >= 1 ? "bg-primary" : "bg-muted"
+            }`}
+          />
+          <div
+            className={`flex-1 h-1 rounded-full ${
+              step >= 2 ? "bg-primary" : "bg-muted"
+            }`}
+          />
         </div>
 
         {step === 1 && (
@@ -234,7 +261,9 @@ export function CreatePageDialog({ open, onOpenChange, onSuccess }: CreatePageDi
                 onChange={(e) => setTelegramLink(e.target.value)}
               />
               {errors.telegramLink && (
-                <p className="text-sm text-destructive">{errors.telegramLink}</p>
+                <p className="text-sm text-destructive">
+                  {errors.telegramLink}
+                </p>
               )}
               <p className="text-xs text-muted-foreground">
                 The private invite link to your Telegram channel
@@ -254,13 +283,17 @@ export function CreatePageDialog({ open, onOpenChange, onSuccess }: CreatePageDi
           <div className="space-y-4">
             <div className="space-y-3">
               {plans.map((plan, index) => (
-                <div 
+                <div
                   key={plan.months}
                   className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30"
                 >
                   <div className="flex-shrink-0 w-20">
                     <span className="text-sm font-medium">
-                      {plan.months === 1 ? '1 Month' : plan.months === 6 ? '6 Months' : '1 Year'}
+                      {plan.months === 1
+                        ? "1 Month"
+                        : plan.months === 6
+                        ? "6 Months"
+                        : "1 Year"}
                     </span>
                   </div>
                   <div className="flex-1 flex items-center gap-2">
@@ -268,14 +301,18 @@ export function CreatePageDialog({ open, onOpenChange, onSuccess }: CreatePageDi
                       type="number"
                       placeholder="0.00"
                       value={plan.price}
-                      onChange={(e) => updatePlan(index, 'price', e.target.value)}
+                      onChange={(e) =>
+                        updatePlan(index, "price", e.target.value)
+                      }
                       className="w-24"
                       min="0"
                       step="0.01"
                     />
                     <select
                       value={plan.currency}
-                      onChange={(e) => updatePlan(index, 'currency', e.target.value)}
+                      onChange={(e) =>
+                        updatePlan(index, "currency", e.target.value)
+                      }
                       className="h-10 px-3 rounded-md border bg-background text-sm"
                     >
                       <option value="USD">USD</option>
@@ -289,7 +326,8 @@ export function CreatePageDialog({ open, onOpenChange, onSuccess }: CreatePageDi
             </div>
 
             <p className="text-xs text-muted-foreground">
-              Leave price empty to disable a plan. At least one plan is required.
+              Leave price empty to disable a plan. At least one plan is
+              required.
             </p>
 
             <div className="flex justify-between pt-4">
@@ -297,7 +335,11 @@ export function CreatePageDialog({ open, onOpenChange, onSuccess }: CreatePageDi
                 <ArrowLeft className="w-4 h-4" />
                 Back
               </Button>
-              <Button variant="gradient" onClick={handleCreate} disabled={loading}>
+              <Button
+                variant="gradient"
+                onClick={handleCreate}
+                disabled={loading}
+              >
                 {loading ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
