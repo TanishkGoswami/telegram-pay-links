@@ -1,21 +1,27 @@
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { Send, Loader2, Check } from 'lucide-react';
-import { z } from 'zod';
-import { PublicLayout } from '@/components/layout/PublicLayout';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
-import type { LandingPage, Plan } from '@/types/database';
-import { addMonths } from 'date-fns';
+import { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { Send, Loader2, Check } from "lucide-react";
+import { z } from "zod";
+import { PublicLayout } from "@/components/layout/PublicLayout";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import type { LandingPage, Plan } from "@/types/database";
+import { addMonths } from "date-fns";
 
-const usernameSchema = z.string()
-  .min(1, 'Username is required')
-  .max(50, 'Username is too long')
-  .refine(val => val.startsWith('@') || !val.includes(' '), 'Invalid username format');
+const telegramIdSchema = z
+  .string()
+  .min(5, "Telegram User ID is required")
+  .regex(/^\d+$/, "Telegram User ID must be numeric");
 
 export default function LandingPageView() {
   const { slug } = useParams<{ slug: string }>();
@@ -27,9 +33,12 @@ export default function LandingPageView() {
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
 
-  const [username, setUsername] = useState('');
+  const [telegramId, setTelegramId] = useState("");
   const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
-  const [error, setError] = useState('');
+  const [paymentProvider, setPaymentProvider] = useState<
+    "razorpay" | "stripe" | "paypal"
+  >("razorpay");
+  const [error, setError] = useState("");
 
   useEffect(() => {
     async function fetchPage() {
@@ -38,16 +47,16 @@ export default function LandingPageView() {
       try {
         // Fetch landing page
         const { data: pageData, error: pageError } = await supabase
-          .from('landing_pages')
-          .select('*')
-          .eq('slug', slug)
-          .eq('is_active', true)
+          .from("landing_pages")
+          .select("*")
+          .eq("slug", slug)
+          .eq("is_active", true)
           .maybeSingle();
 
         if (pageError) throw pageError;
 
         if (!pageData) {
-          navigate('/404');
+          navigate("/404");
           return;
         }
 
@@ -55,10 +64,10 @@ export default function LandingPageView() {
 
         // Fetch plans
         const { data: plansData, error: plansError } = await supabase
-          .from('plans')
-          .select('*')
-          .eq('landing_page_id', pageData.id)
-          .order('duration_months', { ascending: true });
+          .from("plans")
+          .select("*")
+          .eq("landing_page_id", pageData.id)
+          .order("duration_months", { ascending: true });
 
         if (plansError) throw plansError;
 
@@ -66,9 +75,22 @@ export default function LandingPageView() {
         if (plansData && plansData.length > 0) {
           setSelectedPlan(plansData[0] as Plan);
         }
+
+        // Fetch payment config for this user to get the configured provider
+        const { data: paymentConfig, error: configError } = await supabase
+          .from("payment_configs")
+          .select("provider")
+          .eq("user_id", pageData.user_id)
+          .maybeSingle();
+
+        if (!configError && paymentConfig) {
+          setPaymentProvider(
+            paymentConfig.provider as "razorpay" | "stripe" | "paypal"
+          );
+        }
       } catch (error) {
-        console.error('Error fetching page:', error);
-        navigate('/404');
+        console.error("Error fetching page:", error);
+        navigate("/404");
       } finally {
         setLoading(false);
       }
@@ -78,25 +100,24 @@ export default function LandingPageView() {
   }, [slug, navigate]);
 
   const formatPrice = (price: number, currency: string) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
       currency,
     }).format(price);
   };
 
   const getDurationLabel = (months: number) => {
-    if (months === 1) return '1 Month';
-    if (months === 6) return '6 Months';
-    if (months === 12) return '1 Year';
+    if (months === 1) return "1 Month";
+    if (months === 6) return "6 Months";
+    if (months === 12) return "1 Year";
     return `${months} Months`;
   };
 
   const handlePayment = async () => {
-    setError('');
+    setError("");
 
-    // Validate username
-    const formattedUsername = username.startsWith('@') ? username : `@${username}`;
-    const result = usernameSchema.safeParse(formattedUsername);
+    // Validate Telegram User ID
+    const result = telegramIdSchema.safeParse(telegramId.trim());
     if (!result.success) {
       setError(result.error.errors[0].message);
       return;
@@ -107,41 +128,51 @@ export default function LandingPageView() {
     setProcessing(true);
 
     try {
-      const expiryDate = addMonths(new Date(), selectedPlan.duration_months);
+      // Debug logging
+      console.log("🔍 Debug Info:");
+      console.log("Landing Page user_id:", page.user_id);
+      console.log("Payment Provider:", paymentProvider);
+      console.log("Selected Plan:", selectedPlan);
+      console.log("Telegram ID:", telegramId);
 
-      // Create subscription with pending status
-      const { data: subscription, error: subError } = await supabase
-        .from('page_subscriptions')
-        .insert({
-          landing_page_id: page.id,
-          subscriber_username: formattedUsername,
-          status: 'pending',
-          plan_id: selectedPlan.id,
-          expiry_date: expiryDate.toISOString(),
-        })
-        .select()
-        .single();
-
-      if (subError) throw subError;
-
-      // Simulate payment processing
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      // Update to active
-      const { error: updateError } = await supabase
-        .from('page_subscriptions')
-        .update({ status: 'active' })
-        .eq('id', subscription.id);
-
-      if (updateError) throw updateError;
-
-      // Navigate to success page
-      navigate(`/p/${slug}/success?sub=${subscription.id}`);
+      // Call Edge Function to create payment link
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      const res = await fetch(
+        "https://fvqwtfsohpgrdelhplvq.supabase.co/functions/v1/create-payment-link",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${
+              import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
+            }`,
+          },
+          body: JSON.stringify({
+            amount: selectedPlan.price,
+            currency: selectedPlan.currency,
+            plan_title: selectedPlan.plan_title || "",
+            user_telegram_id: parseInt(telegramId.trim(), 10),
+            chat_id: parseInt(telegramId.trim(), 10), // Using user's telegram ID as chat_id for direct messages
+            provider: paymentProvider, // Use provider from payment_configs (Integrations page)
+            user_id: page.user_id, // Landing page owner's user_id for fetching payment config
+            landing_page_id: page.id, // Landing page ID for verification
+            plan_id: selectedPlan.id, // Plan ID for creating subscription
+          }),
+        }
+      );
+      const data = await res.json();
+      if (!res.ok || !data.url) {
+        throw new Error(data.error || "Failed to create payment link");
+      }
+      // Redirect to payment link
+      window.location.href = data.url;
     } catch (error) {
-      console.error('Error processing payment:', error);
+      console.error("Error processing payment:", error);
       toast({
         title: "Payment failed",
-        description: "Something went wrong. Please try again.",
+        description: error.message || "Something went wrong. Please try again.",
         variant: "destructive",
       });
       setProcessing(false);
@@ -182,14 +213,14 @@ export default function LandingPageView() {
           </div>
 
           <CardContent className="p-6 space-y-6">
-            {/* Username Input */}
+            {/* Telegram User ID Input */}
             <div className="space-y-2">
-              <Label htmlFor="username">Your Telegram Username</Label>
+              <Label htmlFor="telegramId">Your Telegram User ID</Label>
               <Input
-                id="username"
-                placeholder="@username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                id="telegramId"
+                placeholder="e.g. 123456789"
+                value={telegramId}
+                onChange={(e) => setTelegramId(e.target.value)}
                 className="text-center text-lg"
               />
               {error && (
@@ -207,8 +238,8 @@ export default function LandingPageView() {
                     onClick={() => setSelectedPlan(plan)}
                     className={`relative p-4 rounded-xl border-2 text-left transition-all ${
                       selectedPlan?.id === plan.id
-                        ? 'border-primary bg-primary/5 shadow-soft'
-                        : 'border-border hover:border-primary/50'
+                        ? "border-primary bg-primary/5 shadow-soft"
+                        : "border-border hover:border-primary/50"
                     }`}
                   >
                     <div className="flex items-center justify-between">
@@ -217,7 +248,11 @@ export default function LandingPageView() {
                           {getDurationLabel(plan.duration_months)}
                         </div>
                         <div className="text-sm text-muted-foreground">
-                          {formatPrice(plan.price / plan.duration_months, plan.currency)}/month
+                          {formatPrice(
+                            plan.price / plan.duration_months,
+                            plan.currency
+                          )}
+                          /month
                         </div>
                       </div>
                       <div className="text-right">
@@ -239,12 +274,12 @@ export default function LandingPageView() {
             </div>
 
             {/* Checkout Button */}
-            <Button 
-              variant="gradient" 
-              size="xl" 
+            <Button
+              variant="gradient"
+              size="xl"
               className="w-full"
               onClick={handlePayment}
-              disabled={!selectedPlan || !username || processing}
+              disabled={!selectedPlan || !telegramId || processing}
             >
               {processing ? (
                 <>
@@ -253,7 +288,9 @@ export default function LandingPageView() {
                 </>
               ) : (
                 <>
-                  Pay {selectedPlan && formatPrice(selectedPlan.price, selectedPlan.currency)}
+                  Pay{" "}
+                  {selectedPlan &&
+                    formatPrice(selectedPlan.price, selectedPlan.currency)}
                 </>
               )}
             </Button>

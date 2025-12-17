@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { FileText, Users, TrendingUp, Plus } from 'lucide-react';
-import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { FileText, Users, TrendingUp, Plus } from "lucide-react";
+import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
 interface DashboardStats {
   totalPages: number;
@@ -25,21 +25,20 @@ export default function Dashboard() {
   useEffect(() => {
     async function fetchStats() {
       if (!user) return;
-
       try {
         // Fetch landing pages count
         const { count: pagesCount } = await supabase
-          .from('landing_pages')
-          .select('*', { count: 'exact', head: true })
-          .eq('user_id', user.id);
+          .from("landing_pages")
+          .select("*", { count: "exact", head: true })
+          .eq("user_id", user.id);
 
         // Fetch landing page IDs for the user
         const { data: pages } = await supabase
-          .from('landing_pages')
-          .select('id')
-          .eq('user_id', user.id);
+          .from("landing_pages")
+          .select("id")
+          .eq("user_id", user.id);
 
-        const pageIds = pages?.map(p => p.id) || [];
+        const pageIds = pages?.map((p) => p.id) || [];
 
         let totalSubs = 0;
         let activeSubs = 0;
@@ -47,16 +46,16 @@ export default function Dashboard() {
         if (pageIds.length > 0) {
           // Fetch total subscribers
           const { count: totalCount } = await supabase
-            .from('page_subscriptions')
-            .select('*', { count: 'exact', head: true })
-            .in('landing_page_id', pageIds);
+            .from("page_subscriptions")
+            .select("*", { count: "exact", head: true })
+            .in("landing_page_id", pageIds);
 
           // Fetch active subscribers
           const { count: activeCount } = await supabase
-            .from('page_subscriptions')
-            .select('*', { count: 'exact', head: true })
-            .in('landing_page_id', pageIds)
-            .eq('status', 'active');
+            .from("page_subscriptions")
+            .select("*", { count: "exact", head: true })
+            .in("landing_page_id", pageIds)
+            .eq("status", "active");
 
           totalSubs = totalCount || 0;
           activeSubs = activeCount || 0;
@@ -68,36 +67,35 @@ export default function Dashboard() {
           activeSubscribers: activeSubs,
         });
       } catch (error) {
-        console.error('Error fetching dashboard stats:', error);
+        console.error("Error fetching dashboard stats:", error);
       } finally {
         setLoading(false);
       }
     }
-
     fetchStats();
   }, [user]);
 
   const statCards = [
     {
-      title: 'Landing Pages',
+      title: "Landing Pages",
       value: stats.totalPages,
       icon: FileText,
-      color: 'text-primary',
-      bgColor: 'bg-primary/10',
+      color: "text-primary",
+      bgColor: "bg-primary/10",
     },
     {
-      title: 'Total Subscribers',
+      title: "Total Subscribers",
       value: stats.totalSubscribers,
       icon: Users,
-      color: 'text-accent-foreground',
-      bgColor: 'bg-accent',
+      color: "text-accent-foreground",
+      bgColor: "bg-accent",
     },
     {
-      title: 'Active Subscribers',
+      title: "Active Subscribers",
       value: stats.activeSubscribers,
       icon: TrendingUp,
-      color: 'text-success',
-      bgColor: 'bg-success/10',
+      color: "text-success",
+      bgColor: "bg-success/10",
     },
   ];
 
@@ -123,7 +121,11 @@ export default function Dashboard() {
         {/* Stats Grid */}
         <div className="grid gap-4 md:grid-cols-3">
           {statCards.map((stat) => (
-            <Card key={stat.title} variant="elevated" className="animate-fade-in">
+            <Card
+              key={stat.title}
+              variant="elevated"
+              className="animate-fade-in"
+            >
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
                   {stat.title}
@@ -152,20 +154,30 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <Link to="/dashboard/pages">
-              <Button variant="outline" className="w-full justify-start h-auto py-4">
+              <Button
+                variant="outline"
+                className="w-full justify-start h-auto py-4"
+              >
                 <FileText className="w-5 h-5 mr-3 text-primary" />
                 <div className="text-left">
                   <div className="font-medium">Manage Pages</div>
-                  <div className="text-xs text-muted-foreground">View and edit your landing pages</div>
+                  <div className="text-xs text-muted-foreground">
+                    View and edit your landing pages
+                  </div>
                 </div>
               </Button>
             </Link>
             <Link to="/dashboard/integrations">
-              <Button variant="outline" className="w-full justify-start h-auto py-4">
+              <Button
+                variant="outline"
+                className="w-full justify-start h-auto py-4"
+              >
                 <TrendingUp className="w-5 h-5 mr-3 text-primary" />
                 <div className="text-left">
                   <div className="font-medium">Setup Payments</div>
-                  <div className="text-xs text-muted-foreground">Configure payment providers</div>
+                  <div className="text-xs text-muted-foreground">
+                    Configure payment providers
+                  </div>
                 </div>
               </Button>
             </Link>

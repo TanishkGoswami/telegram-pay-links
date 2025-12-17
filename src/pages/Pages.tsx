@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
-import { Plus, Copy, ExternalLink, Loader2 } from 'lucide-react';
-import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
-import { Badge } from '@/components/ui/badge';
+import { useState, useEffect } from "react";
+import { Plus, Copy, ExternalLink, Loader2, Trash2 } from "lucide-react";
+import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -12,14 +12,44 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import { CreatePageDialog } from '@/components/CreatePageDialog';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
-import { useToast } from '@/hooks/use-toast';
-import type { LandingPageWithSubscribers } from '@/types/database';
+} from "@/components/ui/table";
+import { CreatePageDialog } from "@/components/CreatePageDialog";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
+import type { LandingPageWithSubscribers } from "@/types/database";
 
-export default function Pages() {
+export default function Pages({
+  onPagesChanged,
+}: { onPagesChanged?: () => void } = {}) {
+  const handleDeletePage = async (pageId: string) => {
+    if (
+      !window.confirm(
+        "Are you sure you want to delete this page? This action cannot be undone."
+      )
+    )
+      return;
+    try {
+      const { error } = await supabase
+        .from("landing_pages")
+        .delete()
+        .eq("id", pageId);
+      if (error) throw error;
+      setPages(pages.filter((p) => p.id !== pageId));
+      if (onPagesChanged) onPagesChanged();
+      toast({
+        title: "Page deleted",
+        description: "The landing page has been deleted.",
+      });
+    } catch (error) {
+      console.error("Error deleting page:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete page.",
+        variant: "destructive",
+      });
+    }
+  };
   const { user } = useAuth();
   const { toast } = useToast();
   const [pages, setPages] = useState<LandingPageWithSubscribers[]>([]);
@@ -31,10 +61,10 @@ export default function Pages() {
 
     try {
       const { data: pagesData, error } = await supabase
-        .from('landing_pages')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+        .from("landing_pages")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
 
       if (error) throw error;
 
@@ -42,9 +72,9 @@ export default function Pages() {
       const pagesWithCounts = await Promise.all(
         (pagesData || []).map(async (page) => {
           const { count } = await supabase
-            .from('page_subscriptions')
-            .select('*', { count: 'exact', head: true })
-            .eq('landing_page_id', page.id);
+            .from("page_subscriptions")
+            .select("*", { count: "exact", head: true })
+            .eq("landing_page_id", page.id);
 
           return {
             ...page,
@@ -55,7 +85,7 @@ export default function Pages() {
 
       setPages(pagesWithCounts);
     } catch (error) {
-      console.error('Error fetching pages:', error);
+      console.error("Error fetching pages:", error);
       toast({
         title: "Error",
         description: "Failed to load pages. Please refresh.",
@@ -73,24 +103,26 @@ export default function Pages() {
   const handleToggleActive = async (pageId: string, currentStatus: boolean) => {
     try {
       const { error } = await supabase
-        .from('landing_pages')
+        .from("landing_pages")
         .update({ is_active: !currentStatus })
-        .eq('id', pageId);
+        .eq("id", pageId);
 
       if (error) throw error;
 
-      setPages(pages.map(p => 
-        p.id === pageId ? { ...p, is_active: !currentStatus } : p
-      ));
+      setPages(
+        pages.map((p) =>
+          p.id === pageId ? { ...p, is_active: !currentStatus } : p
+        )
+      );
 
       toast({
         title: currentStatus ? "Page deactivated" : "Page activated",
-        description: currentStatus 
-          ? "The page is now hidden from public view." 
+        description: currentStatus
+          ? "The page is now hidden from public view."
           : "The page is now live and accepting subscribers.",
       });
     } catch (error) {
-      console.error('Error toggling page status:', error);
+      console.error("Error toggling page status:", error);
       toast({
         title: "Error",
         description: "Failed to update page status.",
@@ -109,7 +141,7 @@ export default function Pages() {
   };
 
   const openPage = (slug: string) => {
-    window.open(`/p/${slug}`, '_blank');
+    window.open(`/p/${slug}`, "_blank");
   };
 
   return (
@@ -148,7 +180,10 @@ export default function Pages() {
                 <p className="text-muted-foreground mb-4">
                   Create your first landing page to start accepting subscribers.
                 </p>
-                <Button variant="gradient" onClick={() => setCreateDialogOpen(true)}>
+                <Button
+                  variant="gradient"
+                  onClick={() => setCreateDialogOpen(true)}
+                >
                   <Plus className="w-4 h-4" />
                   Create Page
                 </Button>
@@ -168,7 +203,9 @@ export default function Pages() {
                   <TableBody>
                     {pages.map((page) => (
                       <TableRow key={page.id}>
-                        <TableCell className="font-medium">{page.title}</TableCell>
+                        <TableCell className="font-medium">
+                          {page.title}
+                        </TableCell>
                         <TableCell>
                           <code className="text-sm bg-muted px-2 py-1 rounded">
                             /p/{page.slug}
@@ -182,7 +219,9 @@ export default function Pages() {
                         <TableCell className="text-center">
                           <Switch
                             checked={page.is_active}
-                            onCheckedChange={() => handleToggleActive(page.id, page.is_active)}
+                            onCheckedChange={() =>
+                              handleToggleActive(page.id, page.is_active)
+                            }
                           />
                         </TableCell>
                         <TableCell className="text-right">
@@ -191,6 +230,7 @@ export default function Pages() {
                               variant="ghost"
                               size="sm"
                               onClick={() => copyLink(page.slug)}
+                              title="Copy link"
                             >
                               <Copy className="w-4 h-4" />
                             </Button>
@@ -198,8 +238,17 @@ export default function Pages() {
                               variant="ghost"
                               size="sm"
                               onClick={() => openPage(page.slug)}
+                              title="Open page"
                             >
                               <ExternalLink className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeletePage(page.id)}
+                              title="Delete page"
+                            >
+                              <Trash2 className="w-4 h-4 text-destructive" />
                             </Button>
                           </div>
                         </TableCell>
@@ -213,10 +262,14 @@ export default function Pages() {
         </Card>
       </div>
 
-      <CreatePageDialog 
-        open={createDialogOpen} 
+      <CreatePageDialog
+        open={createDialogOpen}
         onOpenChange={setCreateDialogOpen}
         onSuccess={fetchPages}
+        onSuccess={() => {
+          fetchPages();
+          if (onPagesChanged) onPagesChanged();
+        }}
       />
     </DashboardLayout>
   );
