@@ -22,25 +22,43 @@ export default function Success() {
       if (!subId || !slug) return;
 
       try {
-        // Fetch subscription
-        const { data: subData, error: subError } = await supabase
-          .from("subscriptions")
-          .select("*")
-          .eq("id", subId)
-          .maybeSingle();
+        // Use public endpoint to fetch subscription data without auth
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+        const response = await fetch(
+          `${supabaseUrl}/functions/v1/verify-payment?subscription_id=${subId}&slug=${slug}`,
+          {
+            headers: {
+              Authorization: `Bearer ${supabaseKey}`,
+            },
+          }
+        );
 
-        if (subError) throw subError;
-        setSubscription(subData as unknown as Subscription);
+        if (!response.ok) {
+          throw new Error("Failed to fetch subscription");
+        }
 
-        // Fetch landing page
-        const { data: pageData, error: pageError } = await supabase
-          .from("landing_pages")
-          .select("*")
-          .eq("slug", slug)
-          .maybeSingle();
+        const data = await response.json();
 
-        if (pageError) throw pageError;
-        setPage(pageData as unknown as LandingPage);
+        // Set subscription data
+        setSubscription({
+          id: data.id,
+          user_telegram_id: data.user_telegram_id,
+          chat_id: data.chat_id,
+          plan_title: data.plan_title,
+          status: data.status,
+          expires_at: data.expires_at,
+          created_at: data.created_at,
+        } as Subscription);
+
+        // Set page data from landing_page
+        if (data.landing_page) {
+          setPage({
+            slug: data.landing_page.slug,
+            title: data.landing_page.title,
+            telegram_invite_link: data.landing_page.telegram_invite_link,
+          } as LandingPage);
+        }
       } catch (error) {
         console.error("Error fetching data:", error);
       } finally {

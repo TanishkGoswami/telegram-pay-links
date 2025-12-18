@@ -56,11 +56,57 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Handle GET request from Razorpay callback
+    // Handle GET request
     if (req.method === "GET") {
       const url = new URL(req.url);
       const razorpayPaymentLinkId = url.searchParams.get("razorpay_payment_link_id");
       const razorpayPaymentId = url.searchParams.get("razorpay_payment_id");
+      
+      // Public endpoint to fetch subscription data (for success page)
+      const subId = url.searchParams.get("subscription_id");
+      const slug = url.searchParams.get("slug");
+      
+      if (subId && slug && !razorpayPaymentLinkId) {
+        try {
+          // Fetch subscription
+          const { data: subscription, error: subError } = await supabase
+            .from("subscriptions")
+            .select("*")
+            .eq("id", subId)
+            .maybeSingle();
+
+          if (subError) throw subError;
+          if (!subscription) {
+            return new Response(JSON.stringify({ error: "Subscription not found" }), {
+              status: 404,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+
+          // Fetch landing page
+          const { data: landingPage, error: pageError } = await supabase
+            .from("landing_pages")
+            .select("slug, title, telegram_invite_link")
+            .eq("slug", slug)
+            .maybeSingle();
+
+          if (pageError) throw pageError;
+          
+          return new Response(JSON.stringify({
+            ...subscription,
+            landing_page: landingPage
+          }), {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        } catch (error) {
+          console.error("[verify-payment] Error fetching subscription:", error);
+          return new Response(JSON.stringify({ error: "Subscription not found", details: error.message }), {
+            status: 404,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      }
 
       if (!razorpayPaymentLinkId) {
         return errorHtml("Invalid Request", "Missing payment link ID in URL parameters.");
@@ -171,33 +217,14 @@ serve(async (req) => {
 
         console.log("[verify-payment] Success! Redirecting to:", redirectUrl);
 
-        // Return HTML with meta refresh AND a manual link as fallback
-        return new Response(
-          `<html>
-            <head>
-              <meta http-equiv="refresh" content="0;url=${redirectUrl}" />
-              <title>Redirecting...</title>
-              <script>window.location.href = "${redirectUrl}";</script>
-              <style>
-                body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; flex-direction: column; text-align: center; }
-                .btn { background: #16a34a; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin-top: 20px; }
-              </style>
-            </head>
-            <body>
-              <h1>Payment Successful!</h1>
-              <p>Redirecting you back to the application...</p>
-              <a href="${redirectUrl}" class="btn">Click here if not redirected</a>
-              <p><small style="color: #666; margin-top: 2rem;">Debug: ${redirectUrl}</small></p>
-            </body>
-          </html>`,
-          {
-            status: 200, // Return 200 so browser renders the HTML immediately
-            headers: {
-              ...corsHeaders,
-              "Content-Type": "text/html"
-            },
-          }
-        );
+        // Use proper HTTP 302 redirect for better browser compatibility
+        return new Response(null, {
+          status: 302,
+          headers: {
+            ...corsHeaders,
+            "Location": redirectUrl,
+          },
+        });
       } else {
         // Payment not paid yet
         return errorHtml("Payment Pending", `Payment status is: ${razorpayData.status}. Please complete payment.`);
